@@ -5,14 +5,16 @@ import {useNavigate} from "react-router-dom";
 import {Path} from "../../Path";
 import Summaries from "../components/Summaries";
 import {FolderApi} from "../../functions/api/FolderApi";
+import {SummaryApi} from "../../functions/api/SummaryApi";
 
 export interface MainProps {
   user?: User
   folderApi: () => FolderApi
+  summaryApi: () => SummaryApi
   onSignOut: () => void
 }
 
-export default function Main({folderApi, user, onSignOut}: MainProps)
+export default function Main({folderApi, summaryApi, user, onSignOut}: MainProps)
 {
   const navigate = useNavigate();
 
@@ -30,7 +32,7 @@ export default function Main({folderApi, user, onSignOut}: MainProps)
           <Stack spacing={2} direction="column">
             <Typography variant="h2">{user.firstName + " " + user.lastName}</Typography>
             <Button variant="text" onClick={signOut}>Sign-Out</Button>
-            <Summaries folderApi={folderApi}/>
+            <Summaries folderApi={folderApi} summaryApi={summaryApi}/>
           </Stack>
         ) :
         (

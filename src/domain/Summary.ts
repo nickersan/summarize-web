@@ -1,4 +1,4 @@
-export class Folder
+export class Summary
 {
   id: number | undefined;
   name: string;

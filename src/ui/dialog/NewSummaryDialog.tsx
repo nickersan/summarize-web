@@ -1,15 +1,18 @@
-import {Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField} from "@mui/material";
-import React from "react";
+import {Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle} from "@mui/material";
+import React, {useState} from "react";
+import FileField from "../components/FileField";
 
 interface NewSummaryDialogProps
 {
   open: boolean
-  onNewSummary: (name: string) => void
+  onNewSummary: (file: File) => void
   onCancel: () => void
 }
 
 export default function NewSummaryDialog({open, onNewSummary, onCancel}: NewSummaryDialogProps)
 {
+  const [file, setFile] = useState<File>();
+
   return (
     <Dialog
       open={open}
@@ -17,20 +20,19 @@ export default function NewSummaryDialog({open, onNewSummary, onCancel}: NewSumm
       PaperProps={
         {
           component: "form",
+          style: { minWidth: "500px" },
           onSubmit: (event: React.FormEvent<HTMLFormElement>) =>
           {
             event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            const formJson = Object.fromEntries((formData as any).entries());
-            onNewSummary(formJson.name);
+            if (file) onNewSummary(file!);
           }
         }
       }
     >
       <DialogTitle>New Summary</DialogTitle>
       <DialogContent>
-        <DialogContentText>Please enter the name of the new folder and select a recording.</DialogContentText>
-        <TextField id="name" label="Name" name="name" autoComplete="name" autoFocus required fullWidth margin="dense"/>
+        <DialogContentText>Please upload a recording file.</DialogContentText>
+        <FileField id="file" onChange={setFile}/>
       </DialogContent>
       <DialogActions>
         <Button type="submit">OK</Button>
