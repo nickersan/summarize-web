@@ -24,45 +24,11 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [dialog, setDialog] = useState<DialogType>(DialogType.None);
 
+  const hideDialog = () => setDialog(DialogType.None);
+
   const currentFolder = (): Folder | undefined =>
   {
     return folderStack.length > 0 ? folderStack[folderStack.length - 1] : undefined;
-  }
-
-  const hideDialog = () => setDialog(DialogType.None);
-
-  const newFolder = (name: string) =>
-  {
-    hideDialog();
-    folderApi().newFolder(name, currentFolder())
-      .then(folder => setFolders([...folders, folder]))
-      .catch(newFolderFailed);
-  }
-
-  const newFolderFailed = (reason: any) =>
-  {
-    console.error("New folder failed: [" + reason.status + "] - " + reason.statusText);
-    setError("Failed to create new folder, please try again.");
-  }
-
-  const newSummary = (file: File) =>
-  {
-    hideDialog();
-    summaryApi().newSummary(file, currentFolder())
-      .then(summary => setSummaries([...summaries, summary]))
-      .catch(newSummaryFailed);
-  }
-
-  const newSummaryFailed = (reason: any) =>
-  {
-    console.error("New summary failed: [" + reason.status + "] - " + reason.statusText);
-    setError("Failed to create new summary, please try again.");
-  }
-
-  const openFolder = (folder: Folder | undefined)=>
-  {
-    if (folder) setFolderStack([...folderStack, folder]);
-    folderApi().all(folder).then(setFolders).catch(openFolderFailed);
   }
 
   const previousFolder = () =>
@@ -71,10 +37,32 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
     openFolder(folderStack.pop())
   }
 
-  const loadFoldersFailed = (reason: any) =>
+  const newFolder = (name: string) =>
   {
-    console.error("Load folders failed: [" + reason.status + "] - " + reason.statusText);
-    setError("Failed to load folders, please refresh to try again.");
+    hideDialog();
+    folderApi().newFolder(name, currentFolder())
+      .then(folder => setFolders([...folders, folder]))
+      .catch(reason => newFailed("folder", reason));
+  }
+
+  const newSummary = (file: File) =>
+  {
+    hideDialog();
+    summaryApi().newSummary(file, currentFolder())
+      .then(summary => setSummaries([...summaries, summary]))
+      .catch(reason => newFailed("summary", reason));
+  }
+
+  const newFailed = (name: string, reason: any) =>
+  {
+    console.error(`New ${name} failed: [${reason.status}] - ${reason.statusText}`);
+    setError(`Failed to create new ${name}, please try again.`);
+  }
+
+  const openFolder = (folder: Folder | undefined)=>
+  {
+    if (folder) setFolderStack([...folderStack, folder]);
+    folderApi().all(folder).then(setFolders).catch(openFolderFailed);
   }
 
   const openFolderFailed = (reason: any) =>
@@ -83,7 +71,14 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
     setError("Failed to open folder, please try again.");
   }
 
-  useEffect(() => { folderApi().all().then(setFolders).catch(loadFoldersFailed) }, []);
+  const loadFailed = (name: string, reason: any) =>
+  {
+      console.error(`Load ${name} failed: [${reason.status}] - ${reason.statusText}`);
+      setError(`Failed to load ${name}, please refresh to try again.`);
+  }
+
+  useEffect(() => { folderApi().all().then(setFolders).catch(reason => loadFailed("folders", reason)) }, []);
+  useEffect(() => { summaryApi().all().then(setSummaries).catch(reason => loadFailed("summaries", reason)) }, []);
 
   return (
     <div className='folders'>
