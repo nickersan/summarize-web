@@ -1,18 +1,29 @@
 import {Avatar, ListItem, ListItemAvatar, ListItemButton, ListItemText} from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
-import React from "react";
+import React, {DragEventHandler} from "react";
 
 interface FolderListItemProps
 {
   key: number | undefined,
   name: string,
-  onClick: () => void
+  draggable?: boolean | undefined,
+  onClick: () => void,
+  onDragStart?: DragEventHandler,
+  onDragOver?: DragEventHandler,
+  onDragEnd?: DragEventHandler,
+  onDrop?: DragEventHandler
 }
 
-export default function FolderListItem({name, onClick}: FolderListItemProps)
+export default function FolderListItem({name, draggable, onClick, onDragStart, onDragOver, onDragEnd, onDrop}: FolderListItemProps)
 {
   return (
-    <ListItem>
+    <ListItem
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={onDrop}
+    >
       <ListItemButton onClick={(event) => { event.preventDefault(); onClick(); } }>
         <ListItemAvatar>
           <Avatar>

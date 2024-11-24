@@ -1,10 +1,10 @@
-import {Folder, Summary} from "../../domain";
+import {Summary} from "../../domain";
 import {Api} from "../../Api";
 
 export interface SummaryApi
 {
-  all(folder?: Folder): Promise<Summary[]>;
-  newSummary(file: File, folder?: Folder): Promise<Summary>;
+  getAll(folderId?: number | undefined): Promise<Summary[]>;
+  create(file: File, folderId?: number | undefined): Promise<Summary>;
 }
 
 export const summaryApi = (accessTokenSupplier: () => string | undefined): SummaryApi =>
@@ -15,9 +15,9 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
     name: string
   }
 
-  const summaryUrl = (folder?: Folder): string =>
+  const summaryUrl = (folderId?: number): string =>
   {
-    return Api.url() + "/v1/summary" + (folder ? "?folderId=" + folder.id : "");
+    return Api.url() + "/v1/summary" + (folderId ? "?folderId=" + folderId : "");
   }
 
   const summaryAudioUrl = (summaryId: number): string =>
@@ -27,16 +27,16 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
 
   const summary = (summaryDto: SummaryDto): Summary =>
   {
-    return new Folder(summaryDto.id, summaryDto.name);
+    return new Summary(summaryDto.id, summaryDto.name);
   }
 
-  const newSummary = async (accessToken: string, file: File, folder?: Folder): Promise<Summary> =>
+  const newSummary = async (accessToken: string, file: File, folderId?: number): Promise<Summary> =>
   {
     const requestOptions =
     {
       method: "POST",
       headers: { "Accept": "application/json", "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
-      body: JSON.stringify({ "folderId": folder?.id, "name": file.name })
+      body: JSON.stringify({ "folderId": folderId, "name": file.name })
     };
 
     return fetch(summaryUrl(), requestOptions)
@@ -62,7 +62,7 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
 
   return new class implements SummaryApi
   {
-    async all(folder?: Folder): Promise<Summary[]>
+    async getAll(folderId?: number): Promise<Summary[]>
     {
       const accessToken = accessTokenSupplier();
       if (!accessToken) return Promise.reject("Access token missing, cannot invoke folder API.");
@@ -73,17 +73,17 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
         headers: { "Accept": "application/json", "Authorization": "Bearer " + accessToken }
       };
 
-      return fetch(summaryUrl(folder), requestOptions)
+      return fetch(summaryUrl(folderId), requestOptions)
         .then(response => response.ok ? response.json() : Promise.reject(response.statusText))
         .then(body => body.map(summary));
     }
 
-    async newSummary(file: File, folder?: Folder): Promise<Summary>
+    async create(file: File, folderId?: number): Promise<Summary>
     {
       const accessToken = accessTokenSupplier();
       if (!accessToken) return Promise.reject("Access token missing, cannot invoke folder API.");
 
-      return newSummary(accessToken, file, folder).then(summary => updateSummaryAudio(accessToken, file, summary));
+      return newSummary(accessToken, file, folderId).then(summary => updateSummaryAudio(accessToken, file, summary));
     }
   }
 }
