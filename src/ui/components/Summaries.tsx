@@ -1,4 +1,4 @@
-import {Button, List, Stack} from "@mui/material";
+import {Breadcrumbs, Button, Link, List, Stack} from "@mui/material";
 import React, {DragEventHandler, useContext, useEffect, useState} from "react";
 import {ErrorContext} from "../context/ErrorContext";
 import {Folder, Summary} from "../../domain";
@@ -8,6 +8,7 @@ import {FolderApi, SummaryApi} from "../../functions/api";
 import FolderListItem from "./FolderListItem";
 import SummaryListItem from "./SummaryListItem";
 import {useSearchParams} from "react-router-dom";
+import HomeIcon from "@mui/icons-material/Home";
 
 interface SummariesProps
 {
@@ -23,6 +24,7 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
   const {setError} = useContext(ErrorContext);
   const [folder, setFolder] = useState<Folder>();
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [folderStack, setFolderStack] = useState<Folder[]>([]);
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [dialog, setDialog] = useState<DialogType>(DialogType.None);
 
@@ -36,13 +38,20 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
 
   const setFolderId = (folderId: number | undefined)=>
   {
-    if (folderId) searchParams.set("folderId", folderId.toString());
-    else searchParams.delete("folderId");
+    if (folderId)
+    {
+      searchParams.set("folderId", folderId.toString());
+    }
+    else
+    {
+      searchParams.delete("folderId");
+      folderLoaded(undefined);
+    }
 
     setSearchParams(searchParams);
   }
 
-  const previousFolder = () =>
+  const parentFolder = () =>
   {
     setFolderId(folder?.parentId)
   }
@@ -50,6 +59,30 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
   const openFolder = (folder: Folder)=>
   {
     setFolderId(folder.id)
+  }
+
+  const folderLoaded = (folder: Folder | undefined) =>
+  {
+    setFolder(folder);
+
+    if (folder) refreshFolderStack([], folder);
+    else setFolderStack([]);
+  }
+
+  const refreshFolderStack = (folderStack: Folder[], folder: Folder) =>
+  {
+    folderStack = [folder, ...folderStack];
+
+    if (folder.parentId)
+    {
+      folderApi().get(folder.parentId)
+        .then(parentFolder => refreshFolderStack(folderStack, parentFolder))
+        .catch(reason => loadFailed("parent folder", reason));
+    }
+    else
+    {
+      setFolderStack(folderStack);
+    }
   }
 
   const newFolder = (name: string) =>
@@ -63,7 +96,7 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
   const newSummary = (file: File) =>
   {
     hideDialog();
-    summaryApi().create(file, folderId)
+    summaryApi().create(file, folder?.id)
       .then(summary => setSummaries([...summaries, summary]))
       .catch(reason => newFailed("summary", reason));
   }
@@ -131,18 +164,31 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
 
   const folderId = getFolderId();
 
-  useEffect(() => { if (folderId) folderApi().get(folderId).then(setFolder).catch(reason => loadFailed("folder", reason)) }, [searchParams]);
+  useEffect(() => { if (folderId) folderApi().get(folderId).then(folderLoaded).catch(reason => loadFailed("folder", reason)) }, [searchParams]);
   useEffect(() => { folderApi().getAll(getFolderId()).then(setFolders).catch(reason => loadFailed("folders", reason)) }, [searchParams]);
   useEffect(() => { summaryApi().getAll(getFolderId()).then(setSummaries).catch(reason => loadFailed("summaries", reason)) }, [searchParams]);
 
   return (
-    <div className='folders'>
+    <div>
+      <Breadcrumbs sx={{ marginLeft: "5px"}}>
+        <Link key="0" sx={{ display: "flex", alignItems: "center" }} color="inherit" href="/">
+          <HomeIcon fontSize="inherit" />
+        </Link>
+        {
+          folderStack.map(
+            (folder) =>
+            (
+              <Link key={folder.id} underline="hover" color="inherit" href={"/?folderId=" + folder.id}>{folder.name}</Link>
+            )
+          )
+        }
+      </Breadcrumbs>
       <Stack spacing={2} direction="row">
         <Button variant="text" onClick={() => setDialog(DialogType.NewFolder)}>New Folder</Button>
         <Button variant="text" onClick={() => setDialog(DialogType.NewSummary)}>New Summary</Button>
       </Stack>
-      <List sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
-        <FolderListItem key={0} name="..." onClick={previousFolder}/>
+      <List sx={{width: "100%", maxWidth: 360, bgcolor: "background.paper"}}>
+        <FolderListItem key={0} name="..." onClick={parentFolder}/>
         {
           folders.map(
             (folder) =>
