@@ -18,7 +18,10 @@ interface SummariesProps
 
 export default function Summaries({folderApi, summaryApi}: SummariesProps)
 {
-  enum DialogType { None, NewFolder , NewSummary}
+  enum DialogType { None, NewFolder , NewSummary }
+
+  const TypePrefixFolder = "folder/";
+  const TypePrefixSummary = "summary/";
 
   const [searchParams, setSearchParams] = useSearchParams();
   const {setError} = useContext(ErrorContext);
@@ -112,41 +115,55 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
     return dataTransfer.types.find(type => type === dragType) !== undefined;
   }
 
+  const isDragTypeSupported = (dataTransfer: DataTransfer): boolean =>
+  {
+    return dataTransfer.types.find(type => type.startsWith(TypePrefixFolder) || type.startsWith(TypePrefixSummary)) != undefined;
+  }
+
   const folderType = (folder: Folder)=>
   {
-    return "folder/" + folder.id;
+    return TypePrefixFolder + folder.id;
   }
 
-  const findFolderType = (dataTransfer: DataTransfer): string | undefined =>
+  const summaryType = (summary: Summary)=>
   {
-    return dataTransfer.types.find(type => type.startsWith("folder/"));
+    return TypePrefixSummary + summary.id;
   }
 
-  const dragStartFolder = (dragFolder: Folder): DragEventHandler => (event) =>
+  const findType = (dataTransfer: DataTransfer, typePrefix: string): string | undefined =>
   {
-    event.dataTransfer.setData(folderType(dragFolder), JSON.stringify(dragFolder));
+    return dataTransfer.types.find(type => type.startsWith(typePrefix));
   }
 
-  const dragOverFolder = (dropFolder: Folder): DragEventHandler => (event) =>
+  const dragStart = (type: string, data: any): DragEventHandler => (event) =>
   {
-    if (!isDragType(event.dataTransfer, folderType(dropFolder))) event.preventDefault();
+    event.dataTransfer.setData(type, JSON.stringify(data));
   }
 
-  const dragEndFolder = (dragFolder: Folder): DragEventHandler => (event) =>
+  const dragOverFolder = (folder: Folder): DragEventHandler => (event) =>
   {
-    // refresh folders
+
+    if (!isDragTypeSupported(event.dataTransfer) || !isDragType(event.dataTransfer, folderType(folder))) event.preventDefault();
   }
 
-  const dropFolder = (dropFolder: Folder): DragEventHandler => (event) =>
+  const drop = (dropFolder: Folder): DragEventHandler => (event) =>
   {
-    const folderType = findFolderType(event.dataTransfer);
+    const folderType = findType(event.dataTransfer, TypePrefixFolder);
     if (folderType)
     {
       const dragFolder = JSON.parse(event.dataTransfer.getData(folderType));
-      // this should be dealt with in the drag end refresh.
-      //setFolders(folders.filter(folder => folder.id !== dragFolder.id));
       dragFolder.parentId = dropFolder.id;
       folderApi().update(dragFolder).catch(reason => updateFailed("folder", reason));
+      loadFolders();
+    }
+
+    const summaryType = findType(event.dataTransfer, TypePrefixSummary);
+    if (summaryType)
+    {
+      const dragSummary = JSON.parse(event.dataTransfer.getData(summaryType));
+      dragSummary.folderId = dropFolder.id;
+      summaryApi().update(dragSummary).catch(reason => updateFailed("summary", reason));
+      loadSummaries();
     }
   }
 
@@ -162,11 +179,25 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
     setError(`Failed to update ${name}, please refresh to try again.`);
   }
 
-  const folderId = getFolderId();
+  const loadFolder = () =>
+  {
+    const folderId = getFolderId();
+    if (folderId) folderApi().get(folderId).then(folderLoaded).catch(reason => loadFailed("folder", reason))
+  }
 
-  useEffect(() => { if (folderId) folderApi().get(folderId).then(folderLoaded).catch(reason => loadFailed("folder", reason)) }, [searchParams]);
-  useEffect(() => { folderApi().getAll(getFolderId()).then(setFolders).catch(reason => loadFailed("folders", reason)) }, [searchParams]);
-  useEffect(() => { summaryApi().getAll(getFolderId()).then(setSummaries).catch(reason => loadFailed("summaries", reason)) }, [searchParams]);
+  const loadFolders = () =>
+  {
+    folderApi().getAll(getFolderId()).then(setFolders).catch(reason => loadFailed("folders", reason));
+  }
+
+  const loadSummaries = () =>
+  {
+    summaryApi().getAll(getFolderId()).then(setSummaries).catch(reason => loadFailed("summaries", reason));
+  }
+
+  useEffect(loadFolder, [searchParams]);
+  useEffect(loadFolders, [searchParams]);
+  useEffect(loadSummaries, [searchParams]);
 
   return (
     <div>
@@ -192,22 +223,33 @@ export default function Summaries({folderApi, summaryApi}: SummariesProps)
         {
           folders.map(
             (folder) =>
-              (
-                <FolderListItem
-                  key={folder.id}
-                  name={folder.name}
-                  draggable={true}
-                  onClick={() => openFolder(folder)}
-                  onDragStart={dragStartFolder(folder)}
-                  onDragOver={dragOverFolder(folder)}
-                  onDragEnd={dragEndFolder(folder)}
-                  onDrop={dropFolder(folder)}
-                />
-              )
+            (
+              <FolderListItem
+                key={folder.id}
+                name={folder.name}
+                draggable={true}
+                onClick={() => openFolder(folder)}
+                onDragStart={dragStart(folderType(folder), folder)}
+                onDragOver={dragOverFolder(folder)}
+                onDragEnd={loadFolders}
+                onDrop={drop(folder)}
+              />
+            )
           )
         }
         {
-          summaries.map((summary) => (<SummaryListItem key={summary.id} name={summary.name}/>))
+          summaries.map(
+            (summary) =>
+            (
+              <SummaryListItem
+                key={summary.id}
+                name={summary.name}
+                draggable={true}
+                onDragStart={dragStart(summaryType(summary), summary)}
+                onDragEnd={loadSummaries}
+              />
+            )
+          )
         }
       </List>
       <NewFolderDialog open={dialog == DialogType.NewFolder} onNewFolder={newFolder} onCancel={hideDialog}/>

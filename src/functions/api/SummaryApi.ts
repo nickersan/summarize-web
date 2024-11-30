@@ -5,6 +5,7 @@ export interface SummaryApi
 {
   getAll(folderId?: number | undefined): Promise<Summary[]>;
   create(file: File, folderId?: number | undefined): Promise<Summary>;
+  update(summary: Summary): Promise<Summary>;
 }
 
 export const summaryApi = (accessTokenSupplier: () => string | undefined): SummaryApi =>
@@ -12,6 +13,7 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
   interface SummaryDto
   {
     id: number,
+    folderId: number | undefined,
     name: string
   }
 
@@ -20,14 +22,19 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
     return Api.url() + "/v1/summary" + (folderId ? "?folderId=" + folderId : "");
   }
 
-  const summaryAudioUrl = (summaryId: number): string =>
+  const summaryIdUrl = (summaryId: number): string =>
   {
-    return Api.url() + "/v1/summary/" + summaryId + "/audio";
+    return Api.url() + "/v1/summary/" + summaryId;
   }
 
-  const summary = (summaryDto: SummaryDto): Summary =>
+  const summaryAudioUrl = (summaryId: number): string =>
   {
-    return new Summary(summaryDto.id, summaryDto.name);
+    return summaryIdUrl(summaryId) + "/audio";
+  }
+
+  const parseSummary = (summaryDto: SummaryDto): Summary =>
+  {
+    return new Summary(summaryDto.id, summaryDto.folderId, summaryDto.name);
   }
 
   const newSummary = async (accessToken: string, file: File, folderId?: number): Promise<Summary> =>
@@ -41,7 +48,7 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
 
     return fetch(summaryUrl(), requestOptions)
       .then(response => response.ok ? response.json() : Promise.reject(response.statusText))
-      .then(body => summary(body));
+      .then(body => parseSummary(body));
   }
 
   const updateSummaryAudio = async (accessToken: string, file: File, summary: Summary): Promise<Summary> =>
@@ -75,7 +82,7 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
 
       return fetch(summaryUrl(folderId), requestOptions)
         .then(response => response.ok ? response.json() : Promise.reject(response.statusText))
-        .then(body => body.map(summary));
+        .then(body => body.map(parseSummary));
     }
 
     async create(file: File, folderId?: number): Promise<Summary>
@@ -84,6 +91,23 @@ export const summaryApi = (accessTokenSupplier: () => string | undefined): Summa
       if (!accessToken) return Promise.reject("Access token missing, cannot invoke folder API.");
 
       return newSummary(accessToken, file, folderId).then(summary => updateSummaryAudio(accessToken, file, summary));
+    }
+
+    async update(summary: Summary): Promise<Summary>
+    {
+      const accessToken = accessTokenSupplier();
+      if (!accessToken) return Promise.reject("Access token missing, cannot invoke folder API.");
+
+      const requestOptions =
+        {
+          method: "PUT",
+          headers: { "Accept": "application/json", "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+          body: JSON.stringify(summary)
+        };
+
+      return fetch(summaryIdUrl(summary.id!), requestOptions)
+        .then(response => response.ok ? response.json() : Promise.reject(response.statusText))
+        .then(body => parseSummary(body));
     }
   }
 }
